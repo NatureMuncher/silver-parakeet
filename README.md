@@ -1,5 +1,7 @@
 # silver-parakeet
+
 MySQL Database dump script
+
 ```
 #- dumpdb.sh 0.91
 ## Usage: dumpdb.sh [-d directory] [-f] [-c] [-e] [-h] [-v]

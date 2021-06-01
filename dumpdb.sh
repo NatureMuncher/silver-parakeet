@@ -13,8 +13,8 @@ ARGS=""
 if [[ $# -gt 0 ]] ; then ARGS="with arguments '${@}'"; fi
 echo "Starting '${0}' ${ARGS}"
 
-#- dumpdb.sh 0.92
-## Usage: dumpdb.sh [-d directory] [-f] [-c] [-e] [-h] [-v]
+#- dumpdb.sh 0.92.1
+## Usage: dumpdb.sh [-d directory] [-f] [-c] [-e] [-h] [-v] [-debug]
 ##
 ##       -d <dir> Set dump directory
 ##       -f       Force regardless of date
@@ -22,6 +22,7 @@ echo "Starting '${0}' ${ARGS}"
 ##       -e       Enable Extended Insert for large tables (over ${EXTENDED_INSERT_MIN_SIZE} MB)
 ##       -h       Show help options.
 ##       -v       Print version info.
+##       -debug   Enable debug.
 ##
 ## Example:
 ##
@@ -46,6 +47,7 @@ echo "Starting '${0}' ${ARGS}"
 DBDUMP_HOME_FOLDER=""               # This will be set by the config file, and indicates where your db dump control files (and by default, the dumps as well) will live 
 MINIMUM_AGE_IN_MINUTES=540          # 540 mins = nine hours
 EXTENDED_INSERT_MIN_SIZE=200        # in Megabytes before compression
+DEBUG=
 
 #################################
 # Read configuration file       #
@@ -91,6 +93,10 @@ COMPARE_ROUTINE=""
 help=$(grep "^## " "${BASH_SOURCE[0]}" | cut -c 4-)
 version=$(grep "^#- "  "${BASH_SOURCE[0]}" | cut -c 4-)
 
+opt_debug() {
+  DEBUG=1
+}
+
 opt_h() {
   echo "$help"
   exit 0
@@ -117,17 +123,17 @@ opt_e() {
   ENABLE_EXTENDED_INSERT="true"
 }
 
-while getopts "hvd:fce" opt; do
+while getopts "debug:hvd:fce" opt; do
   eval "opt_$opt"
 done
 
-if [ -f /home/${USER}/.my.cnf ] # if file exists
+if [ -f ${HOME}/.my.cnf ] # if file exists
 then
-  MYSQL_LOGIN_INFO="/home/${USER}/.my.cnf"
+  MYSQL_LOGIN_INFO="${HOME}/.my.cnf"
   MYSQL_DEFAULTS=""
-elif [ -f /home/${USER}/.mylogin.cnf ] # if file exists
+elif [ -f ${HOME}/.mylogin.cnf ] # if file exists
 then
-  MYSQL_LOGIN_INFO="/home/${USER}/.mylogin.cnf"
+  MYSQL_LOGIN_INFO="${HOME}/.mylogin.cnf"
   MYSQL_DEFAULTS=""
 else
   MYSQL_LOGIN_INFO="/root/.mylogin.cnf"
@@ -268,6 +274,7 @@ fi
 echo "-- Dumping all DB ..."
 for THIS_DATABASE in $(mysql ${MYSQL_DEFAULTS} -e 'show databases' -s --skip-column-names); 
 do
+  [ -z "$DEBUG" ] || echo "info: THIS_DATABASE=$THIS_DATABASE"
   # Skip schema & other DBs
   for EXCLUDE_THIS_DATABASE in information_schema mysql phpmyadmin performance_schema sys
   do
@@ -312,7 +319,7 @@ do
   else                                  # if empty
     IGNORED_DATABASE_TABLES=''
   fi
-
+  [ -z "$DEBUG" ] || echo "info: IGNORED_DATABASE_TABLES=$IGNORED_DATABASE_TABLES"
   # Build big tables array
   if [ -f "${MYSQL_DUMP_BIG_TABLES}.${THIS_DATABASE}.txt" ] # if file exists
   then
@@ -328,7 +335,7 @@ do
   else                                  # if empty
     BIG_DATABASE_TABLES=''
   fi
-
+  [ -z "$DEBUG" ] || echo "info: BIG_DATABASE_TABLES=$BIG_DATABASE_TABLES"
   ########################
   # Clean up old dumps   #
   ########################
@@ -354,10 +361,12 @@ do
   #############################
   
   # this for loop forces BASE TABLEs to be dumped first followed by VIEWs
-  for BASE_OR_VIEW in 'VIEW' # 'BASE TABLE'
-  do 
-  for THIS_TABLE in $(mysql ${MYSQL_DEFAULTS} -NBA -D ${THIS_DATABASE} -e "SHOW FULL TABLES where TABLE_TYPE like '${BASE_OR_VIEW}'" )
+  for BASE_OR_VIEW in 'VIEW' 'BASE TABLE'
   do
+    [ -z "$DEBUG" ] || echo "mysql ${MYSQL_DEFAULTS} -NBA -D ${THIS_DATABASE} -e \"SHOW FULL TABLES where TABLE_TYPE like '${BASE_OR_VIEW}'\""
+  for THIS_TABLE in $(mysql ${MYSQL_DEFAULTS} -NBA -D ${THIS_DATABASE} -e "SHOW FULL TABLES where TABLE_TYPE like '${BASE_OR_VIEW}'"|awk '{print $1}')
+  do
+    [ -z "$DEBUG" ] || echo "info: THIS_DATABASE.THIS_TABLE=${THIS_DATABASE}.${THIS_TABLE}"
     if [[ ! " ${IGNORED_DATABASE_TABLES[@]} " =~ " ${THIS_DATABASE}.${THIS_TABLE} " ]] 
     then
       ############################################
@@ -428,7 +437,6 @@ do
       else
         INNODB_TABLE_DETECTED=""
       fi
-         
 
       ###################################
       # Call functions, perform dumps   #
