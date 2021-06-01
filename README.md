@@ -3,7 +3,7 @@
 MySQL Database dump script
 
 ```
-#- dumpdb.sh 0.91
+#- dumpdb.sh 0.92.1
 ## Usage: dumpdb.sh [-d directory] [-f] [-c] [-e] [-h] [-v]
 ##
 ##       -d <dir> Set dump directory
